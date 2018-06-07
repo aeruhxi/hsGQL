@@ -21,15 +21,17 @@ data Definition
   | Fragment FragmentName TypeCondition SelectionSet
   deriving (Show, Eq)
 
-data SelectionSet
-  = Field (Maybe Alias) (Maybe Name) [Argument] SelectionSet
+type SelectionSet = [Selection]
+data Selection
+  = Fields [Field]
   | FragmentSpread FragmentName
   | InlineFragment (Maybe TypeCondition) SelectionSet
   deriving (Show, Eq)
 
-data Argument
-  = Argument Name Value
-  deriving (Show, Eq)
+data Field = Field (Maybe Alias) Name [Argument] SelectionSet deriving (Show, Eq)
+type Fields = [Field]
+
+type Argument = ObjectField
 
 data VariableType
   = NamedType
@@ -51,4 +53,3 @@ data Value
   | ObjectValue [ObjectField]
   | ListValue [Value]
   deriving (Show, Eq)
-

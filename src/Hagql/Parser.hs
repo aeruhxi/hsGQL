@@ -15,21 +15,36 @@ import           Data.Text                      ( Text
                                                 , pack
                                                 , unpack
                                                 )
+import           Hagql.Util                     ( maybeToList )
+import qualified Text.Megaparsec.Char.Lexer    as L
 
--- parseSelectionSet :: Parser SelectionSet
--- parseSelectionSet = braces $ do
---   name <- identifier
+field :: Parser Field
+field = do
+  x   <- name
+  col <- optional colon
+  case col of
+    Nothing -> do
+      args <- optional arguments
+      sel  <- optional $ many selection
+      return $ Field Nothing x (maybeToList args) (maybeToList sel)
 
+    Just _ -> do
+      y    <- name
+      args <- optional arguments
+      sel  <- optional $ many selection
+      return $ Field (Just x) y (maybeToList args) (maybeToList sel)
 
--- parseArgument :: Parser Argument
--- parseArgument = parens $ do
---   name <- many alphaNumChar
---   colon
---   value <- many
+selection :: Parser Selection
+selection = Fields <$> (braces $ many field)
 
+argument :: Parser Argument
+argument = objectField
 
-parseValue :: Parser Value
-parseValue =
+arguments :: Parser [Argument]
+arguments = parens $ sepBy argument comma
+
+value :: Parser Value
+value =
   (FloatValue <$> float)
     <|> (IntValue <$> signedInteger)
     <|> (BooleanValue <$> bool)
@@ -48,8 +63,9 @@ objectField :: Parser ObjectField
 objectField = do
   x <- name
   colon
-  v <- parseValue
-  pure $ ObjectField (pack x) v
+  v <- value
+  pure $ ObjectField x v
 
 listValues :: Parser [Value]
-listValues = brackets $ sepBy parseValue comma
+listValues = brackets $ many value
+
