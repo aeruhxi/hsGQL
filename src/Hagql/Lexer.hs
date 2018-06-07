@@ -12,11 +12,17 @@ import           Data.Text                      ( Text
                                                 , pack
                                                 , unpack
                                                 )
+import           Data.Char                      ( isSpace )
+import           Data.Functor                   ( void )
 
 type Parser = Parsec Void Text
 
+ignored :: Parser ()
+ignored = void $ takeWhile1P (Just "white space or comma") isIgnored
+  where isIgnored x = isSpace x || x == ','
+
 spaceConsumer :: Parser ()
-spaceConsumer = L.space space1 lineCmnt A.empty
+spaceConsumer = L.space ignored lineCmnt A.empty
   where lineCmnt = L.skipLineComment "#"
 
 lexeme :: Parser a -> Parser a
@@ -70,11 +76,8 @@ stringLiteral :: Parser Text
 stringLiteral =
   (pack . concat) <$> quotes (many (try unicodeEscape <|> escape <|> nonEscape))
 
-integer :: Parser Int32
-integer = lexeme L.decimal
-
 signedInteger :: Parser Int32
-signedInteger = L.signed spaceConsumer integer
+signedInteger = L.signed spaceConsumer (lexeme L.decimal)
 
 float :: Parser Double
 float = try $ lexeme L.float
@@ -89,9 +92,9 @@ bool :: Parser Bool
 bool = (const True) <$> symbol "true" <|> (const False) <$> symbol "false"
 
 null :: Parser ()
-null = symbol "null" >> (return ())
+null = void $ symbol "null"
 
-reservedWords :: [String]
+reservedWords :: [Text]
 reservedWords =
   [ "fragment"
   , "on"
@@ -116,22 +119,22 @@ rword w = (lexeme . try) (string w *> notFollowedBy alphaNumChar)
 nameChar :: Parser Char
 nameChar = char '_' <|> alphaNumChar
 
-name :: Parser String
-name = lexeme $ many nameChar
+name :: Parser Text
+name = lexeme $ pack <$> some nameChar
 
 enum :: Parser Text
 enum = lexeme . try $ do
   x <- name
   if x `elem` ["true", "false", "null"]
     then fail $ "enum " ++ show x ++ " cannot be one of true, false or null"
-    else return $ pack x
+    else return x
 
 identifier :: Parser Text
 identifier = do
   x <- name
   if x `elem` reservedWords
     then fail $ "keyword " ++ show x ++ " cannot be an identifier"
-    else return $ pack x
+    else return x
 
 
 
