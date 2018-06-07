@@ -8,7 +8,6 @@ import           Hagql.Lexer
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer    as L
-import           Data.Void                      ( Void )
 import qualified Control.Applicative           as A
 import           Data.Int                       ( Int32 )
 import           Data.Text                      ( Text
@@ -17,6 +16,19 @@ import           Data.Text                      ( Text
                                                 )
 import           Hagql.Util                     ( maybeToList )
 import qualified Text.Megaparsec.Char.Lexer    as L
+import           Data.Functor                   ( void )
+
+operationDefinition :: Parser Definition
+operationDefinition = do
+  qm   <- symbol "query" <|> symbol "mutation"
+  n    <- optional name
+  vd   <- optional variableDefinitions
+  dirs <- optional directives
+  sels <- selectionSet
+
+  if (qm == "query")
+    then return $ Query n (maybeToList vd) (maybeToList dirs) sels
+    else return $ Mutation n (maybeToList vd) (maybeToList dirs) sels
 
 field :: Parser Selection
 field = do
@@ -117,3 +129,27 @@ fragmentName = do
   if n == "on"
     then fail $ "Fragment name can not be on " ++ show n
     else return n
+
+variable :: Parser Text
+variable = char '$' >> name
+
+variableDefinitions :: Parser [VariableDefinition]
+variableDefinitions = parens (many variableDefinition)
+
+variableDefinition :: Parser VariableDefinition
+variableDefinition = do
+  v <- variable
+  colon
+  t  <- variableType
+  df <- optional value
+  return $ VariableDefinition v t df
+
+variableType :: Parser VariableType
+variableType = try nonNullType <|> namedType <|> listType
+ where
+  namedType   = NamedType <$> name
+  listType    = ListType <$> (brackets variableType)
+  nonNullType = do
+    v <- namedType <|> listType
+    char '!'
+    return $ NonNullType v

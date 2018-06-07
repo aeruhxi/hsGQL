@@ -9,13 +9,14 @@ type FragmentName = Text
 type TypeCondition = Text
 type Name = Text
 type Alias = Text
+type Variable = Text
 
 type Document = [Definition]
 
 data Definition
   -- Operation Definition
-  = Query (NonEmpty SelectionSet)
-  | Mutation (NonEmpty SelectionSet)
+  = Query (Maybe Name) [VariableDefinition] [Directive] SelectionSet
+  | Mutation (Maybe Name) [VariableDefinition] [Directive] SelectionSet
   | Selectionset
   -- Fragment Definition
   | Fragment FragmentName TypeCondition SelectionSet
@@ -33,12 +34,13 @@ data Directive = Directive Name [Argument] deriving (Show, Eq)
 type Argument = ObjectField
 
 data VariableType
-  = NamedType
-  | ListType
-  | NonNullType
+  = NamedType Name
+  | ListType VariableType
+  | NonNullType VariableType
   deriving (Show, Eq)
 
-data Variable = Variable Name VariableType deriving (Show, Eq)
+data VariableDefinition = VariableDefinition Variable VariableType (Maybe Value)
+  deriving (Show, Eq)
 
 data ObjectField = ObjectField Name Value deriving (Show, Eq)
 
