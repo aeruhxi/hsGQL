@@ -18,7 +18,7 @@ import           Data.Text                      ( Text
 import           Hagql.Util                     ( maybeToList )
 import qualified Text.Megaparsec.Char.Lexer    as L
 
-field :: Parser Field
+field :: Parser Selection
 field = do
   x   <- name
   col <- optional colon
@@ -26,26 +26,48 @@ field = do
     Nothing -> do
       args <- optional arguments
       dirs <- optional directives
-      sel  <- optional $ many selection
+      sels <- optional $ selectionSet
       return $ Field Nothing
                      x
                      (maybeToList args)
                      (maybeToList dirs)
-                     (maybeToList sel)
+                     (maybeToList sels)
 
     Just _ -> do
       y    <- name
       args <- optional arguments
       dirs <- optional directives
-      sel  <- optional $ many selection
+      sels <- optional $ selectionSet
       return $ Field (Just x)
                      y
                      (maybeToList args)
                      (maybeToList dirs)
-                     (maybeToList sel)
+                     (maybeToList sels)
+
+fragmentSpread :: Parser Selection
+fragmentSpread = symbol "..." >> FragmentSpread <$> name <*> directives
 
 selection :: Parser Selection
-selection = Fields <$> (braces $ many field)
+selection = try inlineFragment <|> fragmentSpread <|> field
+
+inlineFragment :: Parser Selection
+inlineFragment = do
+  symbol "..."
+  on <- optional $ symbol "on"
+  case on of
+    Nothing -> do
+      dirs <- optional directives
+      sels <- selectionSet
+      return $ InlineFragment Nothing (maybeToList dirs) sels
+    Just _ -> do
+      n    <- name
+      dirs <- optional directives
+      sels <- selectionSet
+      return $ InlineFragment (Just n) (maybeToList dirs) sels
+
+selectionSet :: Parser SelectionSet
+selectionSet = braces $ many selection
+
 
 argument :: Parser Argument
 argument = objectField
@@ -88,3 +110,10 @@ directive = do
 
 directives :: Parser [Directive]
 directives = many directive
+
+fragmentName :: Parser Text
+fragmentName = do
+  n <- name
+  if n == "on"
+    then fail $ "Fragment name can not be on " ++ show n
+    else return n

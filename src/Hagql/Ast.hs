@@ -23,12 +23,10 @@ data Definition
 
 type SelectionSet = [Selection]
 data Selection
-  = Fields [Field]
+  = Field (Maybe Alias) Name [Argument] [Directive] SelectionSet
   | FragmentSpread FragmentName [Directive]
   | InlineFragment (Maybe TypeCondition) [Directive] SelectionSet
   deriving (Show, Eq)
-
-data Field = Field (Maybe Alias) Name [Argument] [Directive] SelectionSet deriving (Show, Eq)
 
 data Directive = Directive Name [Argument] deriving (Show, Eq)
 
