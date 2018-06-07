@@ -25,14 +25,24 @@ field = do
   case col of
     Nothing -> do
       args <- optional arguments
+      dirs <- optional directives
       sel  <- optional $ many selection
-      return $ Field Nothing x (maybeToList args) (maybeToList sel)
+      return $ Field Nothing
+                     x
+                     (maybeToList args)
+                     (maybeToList dirs)
+                     (maybeToList sel)
 
     Just _ -> do
       y    <- name
       args <- optional arguments
+      dirs <- optional directives
       sel  <- optional $ many selection
-      return $ Field (Just x) y (maybeToList args) (maybeToList sel)
+      return $ Field (Just x)
+                     y
+                     (maybeToList args)
+                     (maybeToList dirs)
+                     (maybeToList sel)
 
 selection :: Parser Selection
 selection = Fields <$> (braces $ many field)
@@ -69,3 +79,12 @@ objectField = do
 listValues :: Parser [Value]
 listValues = brackets $ many value
 
+directive :: Parser Directive
+directive = do
+  symbol "@"
+  n    <- name
+  args <- optional arguments
+  return $ Directive n (maybeToList args)
+
+directives :: Parser [Directive]
+directives = many directive
