@@ -89,7 +89,8 @@ arguments = parens $ sepBy argument comma
 
 value :: Parser Value
 value =
-  (FloatValue <$> float)
+  (Variable <$> variable)
+    <|> (FloatValue <$> float)
     <|> (IntValue <$> signedInteger)
     <|> (BooleanValue <$> bool)
     <|> (StringValue <$> stringLiteral)

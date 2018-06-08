@@ -53,4 +53,5 @@ data Value
   | EnumValue Text
   | ObjectValue [ObjectField]
   | ListValue [Value]
+  | Variable Text
   deriving (Show, Eq)
