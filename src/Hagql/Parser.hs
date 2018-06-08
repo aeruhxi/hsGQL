@@ -101,8 +101,7 @@ value =
 
 objectFields :: Parser [ObjectField]
 objectFields =
-  try (symbol "{" >> symbol "}" >> return [])
-    <|> (braces (sepBy objectField comma))
+  try (symbol "{" >> symbol "}" >> return []) <|> (braces (many objectField))
 
 objectField :: Parser ObjectField
 objectField = do
