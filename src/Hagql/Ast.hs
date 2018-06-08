@@ -6,7 +6,6 @@ import           Data.Int                       ( Int32 )
 import           Data.Map                       ( Map )
 
 type FragmentName = Text
-type TypeCondition = Text
 type Name = Text
 type Alias = Text
 type Variable = Text
@@ -19,14 +18,14 @@ data Definition
   | Mutation (Maybe Name) [VariableDefinition] [Directive] SelectionSet
   | Selectionset
   -- Fragment Definition
-  | Fragment FragmentName TypeCondition SelectionSet
+  | Fragment FragmentName VariableType [Directive] SelectionSet
   deriving (Show, Eq)
 
 type SelectionSet = [Selection]
 data Selection
   = Field (Maybe Alias) Name [Argument] [Directive] SelectionSet
   | FragmentSpread FragmentName [Directive]
-  | InlineFragment (Maybe TypeCondition) [Directive] SelectionSet
+  | InlineFragment (Maybe VariableType) [Directive] SelectionSet
   deriving (Show, Eq)
 
 data Directive = Directive Name [Argument] deriving (Show, Eq)

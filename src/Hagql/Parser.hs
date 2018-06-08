@@ -18,6 +18,10 @@ import           Hagql.Util                     ( maybeToList )
 import qualified Text.Megaparsec.Char.Lexer    as L
 import           Data.Functor                   ( void )
 
+document :: Parser Document
+document = many definition
+  where definition = operationDefinition <|> fragmentDefinition
+
 operationDefinition :: Parser Definition
 operationDefinition = do
   qm   <- symbol "query" <|> symbol "mutation"
@@ -56,6 +60,16 @@ field = do
                      (maybeToList dirs)
                      (maybeToList sels)
 
+fragmentDefinition :: Parser Definition
+fragmentDefinition = do
+  symbol "fragment"
+  name <- fragmentName
+  symbol "on"
+  typeCond <- namedType
+  dirs     <- optional directives
+  sels     <- selectionSet
+  return $ Fragment name typeCond (maybeToList dirs) sels
+
 fragmentSpread :: Parser Selection
 fragmentSpread = symbol "..." >> FragmentSpread <$> name <*> directives
 
@@ -72,7 +86,7 @@ inlineFragment = do
       sels <- selectionSet
       return $ InlineFragment Nothing (maybeToList dirs) sels
     Just _ -> do
-      n    <- name
+      n    <- namedType
       dirs <- optional directives
       sels <- selectionSet
       return $ InlineFragment (Just n) (maybeToList dirs) sels
@@ -146,10 +160,15 @@ variableDefinition = do
 
 variableType :: Parser VariableType
 variableType = try nonNullType <|> namedType <|> listType
- where
-  namedType   = NamedType <$> name
-  listType    = ListType <$> (brackets variableType)
-  nonNullType = do
-    v <- namedType <|> listType
-    char '!'
-    return $ NonNullType v
+
+nonNullType :: Parser VariableType
+nonNullType = do
+  v <- namedType <|> listType
+  char '!'
+  return $ NonNullType v
+
+listType :: Parser VariableType
+listType = ListType <$> (brackets variableType)
+
+namedType :: Parser VariableType
+namedType = NamedType <$> name
