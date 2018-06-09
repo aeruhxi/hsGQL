@@ -15,14 +15,13 @@ import           Data.Text                      ( Text
                                                 , unpack
                                                 )
 import           Hagql.Util                     ( maybeToList )
-import qualified Text.Megaparsec.Char.Lexer    as L
 import           Data.Functor                   ( void )
 
 document :: Parser Document
 document = many definition
   where definition = operationDefinition <|> fragmentDefinition
 
-operationDefinition :: Parser Definition
+operationDefinition :: Parser ExecutableDefinition
 operationDefinition = do
   qm   <- symbol "query" <|> symbol "mutation"
   n    <- optional name
@@ -30,9 +29,11 @@ operationDefinition = do
   dirs <- optional directives
   sels <- selectionSet
 
-  if (qm == "query")
-    then return $ Query n (maybeToList vd) (maybeToList dirs) sels
-    else return $ Mutation n (maybeToList vd) (maybeToList dirs) sels
+  let operationType = case qm of
+        "query"    -> Query
+        "mutation" -> Mutation
+
+  return $ Operation operationType n (maybeToList vd) (maybeToList dirs) sels
 
 field :: Parser Selection
 field = do
@@ -42,7 +43,7 @@ field = do
     Nothing -> do
       args <- optional arguments
       dirs <- optional directives
-      sels <- optional $ selectionSet
+      sels <- optional selectionSet
       return $ Field Nothing
                      x
                      (maybeToList args)
@@ -53,14 +54,14 @@ field = do
       y    <- name
       args <- optional arguments
       dirs <- optional directives
-      sels <- optional $ selectionSet
+      sels <- optional selectionSet
       return $ Field (Just x)
                      y
                      (maybeToList args)
                      (maybeToList dirs)
                      (maybeToList sels)
 
-fragmentDefinition :: Parser Definition
+fragmentDefinition :: Parser ExecutableDefinition
 fragmentDefinition = do
   symbol "fragment"
   name <- fragmentName
@@ -115,7 +116,7 @@ value =
 
 objectFields :: Parser [ObjectField]
 objectFields =
-  try (symbol "{" >> symbol "}" >> return []) <|> (braces (many objectField))
+  try (symbol "{" >> symbol "}" >> return []) <|> braces (many objectField)
 
 objectField :: Parser ObjectField
 objectField = do
@@ -168,7 +169,7 @@ nonNullType = do
   return $ NonNullType v
 
 listType :: Parser VariableType
-listType = ListType <$> (brackets variableType)
+listType = ListType <$> brackets variableType
 
 namedType :: Parser VariableType
 namedType = NamedType <$> name

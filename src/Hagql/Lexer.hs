@@ -74,7 +74,7 @@ nonEscape = pure <$> noneOf escapedChars'
 
 stringLiteral :: Parser Text
 stringLiteral =
-  (pack . concat) <$> quotes (many (try unicodeEscape <|> escape <|> nonEscape))
+  pack . concat <$> quotes (many (try unicodeEscape <|> escape <|> nonEscape))
 
 signedInteger :: Parser Int32
 signedInteger = L.signed spaceConsumer (lexeme L.decimal)
@@ -89,7 +89,7 @@ colon :: Parser Text
 colon = symbol ":"
 
 bool :: Parser Bool
-bool = (const True) <$> symbol "true" <|> (const False) <$> symbol "false"
+bool = (True <$ symbol "true") <|> (False <$ symbol "false")
 
 null :: Parser ()
 null = void $ symbol "null"
@@ -135,6 +135,3 @@ identifier = do
   if x `elem` reservedWords
     then fail $ "keyword " ++ show x ++ " cannot be an identifier"
     else return x
-
-
-
