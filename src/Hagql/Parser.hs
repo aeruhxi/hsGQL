@@ -32,11 +32,34 @@ executableDefinition = operationDefinition <|> fragmentDefinition
 
 typeSystemDefinition :: Parser TypeSystemDefinition
 typeSystemDefinition =
-  scalarTypeDefinition
-    <|> objectTypeDefinition
-    <|> unionTypeDefinition
-    <|> enumTypeDefinition
-    <|> inputObjectTypeDefinition
+  try schemaDefinition
+    <|> try scalarTypeDefinition
+    <|> try objectTypeDefinition
+    <|> try unionTypeDefinition
+    <|> try enumTypeDefinition
+    <|> try inputObjectTypeDefinition
+
+-- SchemaDefinition Parser
+------------------------------------------------------------------------------
+
+schemaDefinition :: Parser TypeSystemDefinition
+schemaDefinition = do
+  symbol "schema"
+  dirs  <- optional directives
+  rotds <- braces $ some rootOperationTypeDefinition
+  return $ SchemaDefinition (maybeToList dirs) rotds
+
+rootOperationTypeDefinition :: Parser RootOperationTypeDefinition
+rootOperationTypeDefinition = do
+  op <- operationType
+  symbol ":"
+  t <- name
+  let op' = case op of
+        "query"    -> Query
+        "mutation" -> Mutation
+        _          -> Subscription
+  return $ RootOperationTypeDefinition op' t
+
 
 -- Type Definition Parser
 --------------------------------------------------------------------------------
@@ -85,7 +108,7 @@ inputObjectTypeDefinition :: Parser TypeSystemDefinition
 inputObjectTypeDefinition = do
   desc <- optional description
   symbol "input"
-  n           <- name
+  n    <- name
   dirs <- optional directives
   ifds <- optional $ braces (many inputValueDefinition)
   return
@@ -157,7 +180,7 @@ enumValue = lexeme . try $ do
 
 operationDefinition :: Parser ExecutableDefinition
 operationDefinition = do
-  qm   <- symbol "query" <|> symbol "mutation"
+  qm   <- operationType
   n    <- optional name
   vd   <- optional variableDefinitions
   dirs <- optional directives
@@ -166,6 +189,7 @@ operationDefinition = do
   let operationType = case qm of
         "query"    -> Query
         "mutation" -> Mutation
+        _          -> Subscription
 
   return $ Operation operationType n (maybeToList vd) (maybeToList dirs) sels
 
@@ -310,3 +334,6 @@ listType = ListType <$> brackets variableType
 
 namedType :: Parser VariableType
 namedType = NamedType <$> name
+
+operationType :: Parser Text
+operationType = symbol "query" <|> symbol "mutation" <|> symbol "subscription"

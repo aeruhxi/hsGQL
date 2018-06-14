@@ -12,6 +12,7 @@ data Definition
   = ExecutableDefinition ExecutableDefinition
   | TypeSystemDefinition TypeSystemDefinition
   -- | TypeSystemExtension TypeSystemExtension -- TODO: Implement later
+  deriving  (Show, Eq)
 
 -- Operations
 data OperationType = Query | Mutation | Subscription
