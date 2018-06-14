@@ -40,6 +40,9 @@ braces = between (symbol "{") (symbol "}")
 quotes :: Parser a -> Parser a
 quotes = between (symbol "\"") (symbol "\"")
 
+quotes3 :: Parser a -> Parser a
+quotes3 = between (symbol "\"\"\"") (symbol "\"\"\"")
+
 brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")
 
@@ -73,8 +76,9 @@ nonEscape :: Parser String
 nonEscape = pure <$> noneOf escapedChars'
 
 stringLiteral :: Parser Text
-stringLiteral =
-  pack . concat <$> quotes (many (try unicodeEscape <|> escape <|> nonEscape))
+stringLiteral = fmap (pack . concat)
+                     (q (many (try unicodeEscape <|> escape <|> nonEscape)))
+  where q x = try (quotes3 x) <|> quotes x
 
 signedInteger :: Parser Int32
 signedInteger = L.signed spaceConsumer (lexeme L.decimal)
@@ -121,13 +125,6 @@ nameChar = char '_' <|> alphaNumChar
 
 name :: Parser Text
 name = lexeme $ pack <$> some nameChar
-
-enum :: Parser Text
-enum = lexeme . try $ do
-  x <- name
-  if x `elem` ["true", "false", "null"]
-    then fail $ "enum " ++ show x ++ " cannot be one of true, false or null"
-    else return x
 
 identifier :: Parser Text
 identifier = do

@@ -17,9 +17,143 @@ import           Data.Text                      ( Text
 import           Hagql.Util                     ( maybeToList )
 import           Data.Functor                   ( void )
 
+
+-- Root Document Parser
 document :: Parser Document
 document = many definition
-  where definition = operationDefinition <|> fragmentDefinition
+
+definition :: Parser Definition
+definition =
+  (ExecutableDefinition <$> executableDefinition)
+    <|> (TypeSystemDefinition <$> typeSystemDefinition)
+
+executableDefinition :: Parser ExecutableDefinition
+executableDefinition = operationDefinition <|> fragmentDefinition
+
+typeSystemDefinition :: Parser TypeSystemDefinition
+typeSystemDefinition =
+  scalarTypeDefinition
+    <|> objectTypeDefinition
+    <|> unionTypeDefinition
+    <|> enumTypeDefinition
+    <|> inputObjectTypeDefinition
+
+-- Type Definition Parser
+--------------------------------------------------------------------------------
+
+scalarTypeDefinition :: Parser TypeSystemDefinition
+scalarTypeDefinition = do
+  desc <- optional description
+  symbol "scalar"
+  name <- name
+  dirs <- optional directives
+  return $ ScalarTypeDefinition desc name (maybeToList dirs)
+
+objectTypeDefinition :: Parser TypeSystemDefinition
+objectTypeDefinition = do
+  desc <- optional description
+  symbol "type"
+  name <- name
+  imp  <- optional implementsInterfaces
+  dirs <- optional directives
+  fds  <- optional fieldDefinitions
+  return $ ObjectTypeDefinition desc
+                                name
+                                (maybeToList imp)
+                                (maybeToList dirs)
+                                (maybeToList fds)
+
+unionTypeDefinition :: Parser TypeSystemDefinition
+unionTypeDefinition = do
+  desc <- optional description
+  symbol "union"
+  n    <- name
+  dirs <- optional directives
+  un   <- optional unionMemberTypes
+  return $ UnionTypeDefinition desc n (maybeToList dirs) (maybeToList un)
+
+enumTypeDefinition :: Parser TypeSystemDefinition
+enumTypeDefinition = do
+  desc <- optional description
+  symbol "enum"
+  n    <- name
+  dirs <- optional directives
+  evs  <- optional $ braces (many enumValueDefinition)
+  return $ EnumTypeDefinition desc n (maybeToList dirs) (maybeToList evs)
+
+inputObjectTypeDefinition :: Parser TypeSystemDefinition
+inputObjectTypeDefinition = do
+  desc <- optional description
+  symbol "input"
+  n           <- name
+  dirs <- optional directives
+  ifds <- optional $ braces (many inputValueDefinition)
+  return
+    $ InputObjectTypeDefinition desc n (maybeToList dirs) (maybeToList ifds)
+
+-- Utilities
+
+implementsInterfaces :: Parser ImplementsInterfaces
+implementsInterfaces = do
+  symbol "implements"
+  optional $ symbol "&"
+  first <- name
+  rest  <- many $ symbol "&" >> name
+  return $ first : rest
+
+fieldDefinition :: Parser FieldDefinition
+fieldDefinition = do
+  desc  <- optional description
+  name  <- name
+  argsd <- optional argumentsDefinition
+  symbol ":"
+  t    <- variableType
+  dirs <- optional directives
+  return $ FieldDefinition desc name (maybeToList argsd) t (maybeToList dirs)
+
+fieldDefinitions :: Parser [FieldDefinition]
+fieldDefinitions = braces (many fieldDefinition)
+
+inputValueDefinition :: Parser InputValueDefinition
+inputValueDefinition = do
+  desc <- optional description
+  name <- name
+  symbol ":"
+  t    <- variableType
+  df   <- optional defaultValue
+  dirs <- optional directives
+  return $ InputValueDefinition desc name t df (maybeToList dirs)
+
+argumentsDefinition :: Parser ArgumentsDefinition
+argumentsDefinition = parens (many inputValueDefinition)
+
+description :: Parser Text
+description = stringLiteral
+
+unionMemberTypes :: Parser UnionMemberTypes
+unionMemberTypes = do
+  symbol "="
+  optional $ symbol "|"
+  first <- name
+  rest  <- many $ symbol "|" >> name
+  return $ first : rest
+
+enumValueDefinition :: Parser EnumValueDefinition
+enumValueDefinition = do
+  desc <- optional description
+  ev   <- enumValue
+  dirs <- optional directives
+  return $ EnumValueDefinition desc ev (maybeToList dirs)
+
+enumValue :: Parser EnumValue
+enumValue = lexeme . try $ do
+  x <- name
+  if x `elem` ["true", "false", "null"]
+    then fail $ "enum " ++ show x ++ " cannot be one of true, false or null"
+    else return x
+
+-- Executable Definition Parser
+--------------------------------------------------------------------------------
 
 operationDefinition :: Parser ExecutableDefinition
 operationDefinition = do
@@ -112,7 +246,7 @@ value =
     <|> (NullValue <$ null)
     <|> (ObjectValue <$> objectFields)
     <|> (ListValue <$> listValues)
-    <|> (EnumValue <$> enum)
+    <|> (EnumValue <$> enumValue)
 
 objectFields :: Parser [ObjectField]
 objectFields =
@@ -156,8 +290,11 @@ variableDefinition = do
   v <- variable
   colon
   t  <- variableType
-  df <- optional value
+  df <- optional defaultValue
   return $ VariableDefinition v t df
+
+defaultValue :: Parser Value
+defaultValue = symbol "=" >> value
 
 variableType :: Parser VariableType
 variableType = try nonNullType <|> namedType <|> listType
