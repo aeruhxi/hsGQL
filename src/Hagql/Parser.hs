@@ -14,8 +14,8 @@ import           Data.Text                      ( Text
                                                 , pack
                                                 , unpack
                                                 )
-import           Hagql.Util                     ( maybeToList )
 import           Data.Functor                   ( void )
+import           Data.Maybe                     ( maybeToList )
 
 
 -- Root Document Parser
