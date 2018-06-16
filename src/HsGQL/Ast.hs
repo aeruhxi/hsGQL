@@ -1,9 +1,7 @@
 module HsGQL.Ast where
 
 import           Data.Text                      ( Text )
-import           Data.List.NonEmpty             ( NonEmpty )
 import           Data.Int                       ( Int32 )
-import           Data.Map                       ( Map )
 
 -- Root Document
 type Document = [Definition]

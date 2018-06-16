@@ -10,7 +10,6 @@ import qualified Control.Applicative           as A
 import           Data.Int                       ( Int32 )
 import           Data.Text                      ( Text
                                                 , pack
-                                                , unpack
                                                 )
 import           Data.Char                      ( isSpace )
 import           Data.Functor                   ( void )
@@ -46,14 +45,16 @@ quotes3 = between (symbol "\"\"\"") (symbol "\"\"\"")
 brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")
 
+escapedChars :: String
 escapedChars = ['\\', '"', '/', 'b', 'f', 'n', 'r', 't']
 
 -- For nonEscape and include \ before bfnrt
+escapedChars' :: String
 escapedChars' = ['\\', '"', '/', '\b', '\f', '\n', '\r', '\t']
 
 escape :: Parser String
 escape = do
-  char '\\'
+  _ <- char '\\'
   x <- oneOf escapedChars
   return . return $ case x of
     '\\' -> x
@@ -64,6 +65,7 @@ escape = do
     'n'  -> '\n'
     'r'  -> '\r'
     't'  -> '\t'
+    _    -> error "Just to make the pattern matching exhaustive"
 
 unicodeEscape :: Parser String
 unicodeEscape = do

@@ -2,21 +2,15 @@
 
 module HsGQL.Parser
   ( document
-  ) where
+  )
+where
 
 import           Prelude                 hiding ( null )
 import           HsGQL.Ast
 import           HsGQL.Lexer
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer    as L
-import qualified Control.Applicative           as A
-import           Data.Int                       ( Int32 )
-import           Data.Text                      ( Text
-                                                , pack
-                                                , unpack
-                                                )
-import           Data.Functor                   ( void )
+import           Data.Text                      ( Text )
 import           HsGQL.Util                     ( listFromMaybe )
 
 -- Root Document Parser
@@ -45,7 +39,7 @@ typeSystemDefinition =
 
 schemaDefinition :: Parser TypeSystemDefinition
 schemaDefinition = do
-  symbol "schema"
+  _     <- symbol "schema"
   dirs  <- directives
   rotds <- rootOperationTypeDefinitions
   return $ SchemaDefinition dirs rotds
@@ -53,8 +47,8 @@ schemaDefinition = do
 rootOperationTypeDefinition :: Parser RootOperationTypeDefinition
 rootOperationTypeDefinition = do
   op <- operationType
-  symbol ":"
-  t <- name
+  _  <- symbol ":"
+  t  <- name
   let op' = case op of
         "query"    -> Query
         "mutation" -> Mutation
@@ -71,25 +65,25 @@ rootOperationTypeDefinitions = braces $ some rootOperationTypeDefinition
 scalarTypeDefinition :: Parser TypeSystemDefinition
 scalarTypeDefinition = do
   desc <- optional description
-  symbol "scalar"
-  name <- name
+  _    <- symbol "scalar"
+  n    <- name
   dirs <- directives
-  return $ ScalarTypeDefinition desc name dirs
+  return $ ScalarTypeDefinition desc n dirs
 
 objectTypeDefinition :: Parser TypeSystemDefinition
 objectTypeDefinition = do
   desc <- optional description
-  symbol "type"
-  name <- name
+  _    <- symbol "type"
+  n    <- name
   imp  <- implementsInterfaces
   dirs <- directives
   fsd  <- fieldsDefinition
-  return $ ObjectTypeDefinition desc name imp dirs fsd
+  return $ ObjectTypeDefinition desc n imp dirs fsd
 
 unionTypeDefinition :: Parser TypeSystemDefinition
 unionTypeDefinition = do
   desc <- optional description
-  symbol "union"
+  _    <- symbol "union"
   n    <- name
   dirs <- directives
   un   <- unionMemberTypes
@@ -98,7 +92,7 @@ unionTypeDefinition = do
 enumTypeDefinition :: Parser TypeSystemDefinition
 enumTypeDefinition = do
   desc <- optional description
-  symbol "enum"
+  _    <- symbol "enum"
   n    <- name
   dirs <- directives
   evs  <- enumValueDefinitions
@@ -107,7 +101,7 @@ enumTypeDefinition = do
 inputObjectTypeDefinition :: Parser TypeSystemDefinition
 inputObjectTypeDefinition = do
   desc <- optional description
-  symbol "input"
+  _    <- symbol "input"
   n    <- name
   dirs <- directives
   ifds <- inputValueDefinitions
@@ -116,9 +110,9 @@ inputObjectTypeDefinition = do
 -- Utilities
 
 implementsInterfaces :: Parser ImplementsInterfaces
-implementsInterfaces =  fmap listFromMaybe $ optional $ do
-  symbol "implements"
-  optional $ symbol "&"
+implementsInterfaces = fmap listFromMaybe $ optional $ do
+  _     <- symbol "implements"
+  _     <- optional $ symbol "&"
   first <- name
   rest  <- many $ symbol "&" >> name
   return $ first : rest
@@ -126,12 +120,12 @@ implementsInterfaces =  fmap listFromMaybe $ optional $ do
 fieldDefinition :: Parser FieldDefinition
 fieldDefinition = do
   desc  <- optional description
-  name  <- name
+  n     <- name
   argsd <- argumentsDefinition
-  symbol ":"
-  t    <- variableType
-  dirs <- directives
-  return $ FieldDefinition desc name argsd t dirs
+  _     <- symbol ":"
+  t     <- variableType
+  dirs  <- directives
+  return $ FieldDefinition desc n argsd t dirs
 
 fieldsDefinition :: Parser [FieldDefinition]
 fieldsDefinition =
@@ -140,12 +134,12 @@ fieldsDefinition =
 inputValueDefinition :: Parser InputValueDefinition
 inputValueDefinition = do
   desc <- optional description
-  name <- name
-  symbol ":"
+  n    <- name
+  _    <- symbol ":"
   t    <- variableType
   df   <- optional defaultValue
   dirs <- directives
-  return $ InputValueDefinition desc name t df dirs
+  return $ InputValueDefinition desc n t df dirs
 
 inputValueDefinitions :: Parser [InputValueDefinition]
 inputValueDefinitions =
@@ -160,8 +154,8 @@ description = stringLiteral
 
 unionMemberTypes :: Parser UnionMemberTypes
 unionMemberTypes = do
-  symbol "="
-  optional $ symbol "|"
+  _     <- symbol "="
+  _     <- optional $ symbol "|"
   first <- name
   rest  <- many $ symbol "|" >> name
   return $ first : rest
@@ -222,13 +216,13 @@ field = do
 
 fragmentDefinition :: Parser ExecutableDefinition
 fragmentDefinition = do
-  symbol "fragment"
-  name <- fragmentName
-  symbol "on"
+  _        <- symbol "fragment"
+  n        <- fragmentName
+  _        <- symbol "on"
   typeCond <- namedType
   dirs     <- directives
   sels     <- selectionSet
-  return $ Fragment name typeCond dirs sels
+  return $ Fragment n typeCond dirs sels
 
 fragmentSpread :: Parser Selection
 fragmentSpread = symbol "..." >> FragmentSpread <$> name <*> directives
@@ -238,7 +232,7 @@ selection = try inlineFragment <|> fragmentSpread <|> field
 
 inlineFragment :: Parser Selection
 inlineFragment = do
-  symbol "..."
+  _  <- symbol "..."
   on <- optional $ symbol "on"
   case on of
     Nothing -> do
@@ -278,7 +272,7 @@ objectFields = braces (many objectField)
 objectField :: Parser ObjectField
 objectField = do
   x <- name
-  colon
+  _ <- colon
   v <- value
   pure $ ObjectField x v
 
@@ -287,7 +281,7 @@ listValues = brackets $ many value
 
 directive :: Parser Directive
 directive = do
-  symbol "@"
+  _    <- symbol "@"
   n    <- name
   args <- optional arguments
   return $ Directive n (listFromMaybe args)
@@ -310,8 +304,8 @@ variableDefinitions = parens (many variableDefinition)
 
 variableDefinition :: Parser VariableDefinition
 variableDefinition = do
-  v <- variable
-  colon
+  v  <- variable
+  _  <- colon
   t  <- variableType
   df <- optional defaultValue
   return $ VariableDefinition v t df
@@ -325,7 +319,7 @@ variableType = try nonNullType <|> namedType <|> listType
 nonNullType :: Parser VariableType
 nonNullType = do
   v <- namedType <|> listType
-  char '!'
+  _ <- char '!'
   return $ NonNullType v
 
 listType :: Parser VariableType
