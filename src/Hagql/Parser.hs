@@ -15,12 +15,11 @@ import           Data.Text                      ( Text
                                                 , unpack
                                                 )
 import           Data.Functor                   ( void )
-import           Data.Maybe                     ( maybeToList )
-
+import           Hagql.Util                     ( listFromMaybe )
 
 -- Root Document Parser
 document :: Parser Document
-document = many definition
+document = some definition
 
 definition :: Parser Definition
 definition =
@@ -45,9 +44,9 @@ typeSystemDefinition =
 schemaDefinition :: Parser TypeSystemDefinition
 schemaDefinition = do
   symbol "schema"
-  dirs  <- optional directives
-  rotds <- braces $ some rootOperationTypeDefinition
-  return $ SchemaDefinition (maybeToList dirs) rotds
+  dirs  <- directives
+  rotds <- rootOperationTypeDefinitions
+  return $ SchemaDefinition dirs rotds
 
 rootOperationTypeDefinition :: Parser RootOperationTypeDefinition
 rootOperationTypeDefinition = do
@@ -60,6 +59,9 @@ rootOperationTypeDefinition = do
         _          -> Subscription
   return $ RootOperationTypeDefinition op' t
 
+rootOperationTypeDefinitions :: Parser [RootOperationTypeDefinition]
+rootOperationTypeDefinitions = braces $ some rootOperationTypeDefinition
+
 
 -- Type Definition Parser
 --------------------------------------------------------------------------------
@@ -69,55 +71,50 @@ scalarTypeDefinition = do
   desc <- optional description
   symbol "scalar"
   name <- name
-  dirs <- optional directives
-  return $ ScalarTypeDefinition desc name (maybeToList dirs)
+  dirs <- directives
+  return $ ScalarTypeDefinition desc name dirs
 
 objectTypeDefinition :: Parser TypeSystemDefinition
 objectTypeDefinition = do
   desc <- optional description
   symbol "type"
   name <- name
-  imp  <- optional implementsInterfaces
-  dirs <- optional directives
-  fds  <- optional fieldDefinitions
-  return $ ObjectTypeDefinition desc
-                                name
-                                (maybeToList imp)
-                                (maybeToList dirs)
-                                (maybeToList fds)
+  imp  <- implementsInterfaces
+  dirs <- directives
+  fsd  <- fieldsDefinition
+  return $ ObjectTypeDefinition desc name imp dirs fsd
 
 unionTypeDefinition :: Parser TypeSystemDefinition
 unionTypeDefinition = do
   desc <- optional description
   symbol "union"
   n    <- name
-  dirs <- optional directives
-  un   <- optional unionMemberTypes
-  return $ UnionTypeDefinition desc n (maybeToList dirs) (maybeToList un)
+  dirs <- directives
+  un   <- unionMemberTypes
+  return $ UnionTypeDefinition desc n dirs un
 
 enumTypeDefinition :: Parser TypeSystemDefinition
 enumTypeDefinition = do
   desc <- optional description
   symbol "enum"
   n    <- name
-  dirs <- optional directives
-  evs  <- optional $ braces (many enumValueDefinition)
-  return $ EnumTypeDefinition desc n (maybeToList dirs) (maybeToList evs)
+  dirs <- directives
+  evs  <- enumValueDefinitions
+  return $ EnumTypeDefinition desc n dirs evs
 
 inputObjectTypeDefinition :: Parser TypeSystemDefinition
 inputObjectTypeDefinition = do
   desc <- optional description
   symbol "input"
   n    <- name
-  dirs <- optional directives
-  ifds <- optional $ braces (many inputValueDefinition)
-  return
-    $ InputObjectTypeDefinition desc n (maybeToList dirs) (maybeToList ifds)
+  dirs <- directives
+  ifds <- inputValueDefinitions
+  return $ InputObjectTypeDefinition desc n dirs ifds
 
 -- Utilities
 
 implementsInterfaces :: Parser ImplementsInterfaces
-implementsInterfaces = do
+implementsInterfaces =  fmap listFromMaybe $ optional $ do
   symbol "implements"
   optional $ symbol "&"
   first <- name
@@ -128,14 +125,15 @@ fieldDefinition :: Parser FieldDefinition
 fieldDefinition = do
   desc  <- optional description
   name  <- name
-  argsd <- optional argumentsDefinition
+  argsd <- argumentsDefinition
   symbol ":"
   t    <- variableType
-  dirs <- optional directives
-  return $ FieldDefinition desc name (maybeToList argsd) t (maybeToList dirs)
+  dirs <- directives
+  return $ FieldDefinition desc name argsd t dirs
 
-fieldDefinitions :: Parser [FieldDefinition]
-fieldDefinitions = braces (many fieldDefinition)
+fieldsDefinition :: Parser [FieldDefinition]
+fieldsDefinition =
+  fmap listFromMaybe (optional $ braces $ many fieldDefinition)
 
 inputValueDefinition :: Parser InputValueDefinition
 inputValueDefinition = do
@@ -144,11 +142,16 @@ inputValueDefinition = do
   symbol ":"
   t    <- variableType
   df   <- optional defaultValue
-  dirs <- optional directives
-  return $ InputValueDefinition desc name t df (maybeToList dirs)
+  dirs <- directives
+  return $ InputValueDefinition desc name t df dirs
+
+inputValueDefinitions :: Parser [InputValueDefinition]
+inputValueDefinitions =
+  fmap listFromMaybe (optional $ braces $ many inputValueDefinition)
 
 argumentsDefinition :: Parser ArgumentsDefinition
-argumentsDefinition = parens (many inputValueDefinition)
+argumentsDefinition =
+  fmap listFromMaybe (optional $ parens $ many inputValueDefinition)
 
 description :: Parser Text
 description = stringLiteral
@@ -165,8 +168,12 @@ enumValueDefinition :: Parser EnumValueDefinition
 enumValueDefinition = do
   desc <- optional description
   ev   <- enumValue
-  dirs <- optional directives
-  return $ EnumValueDefinition desc ev (maybeToList dirs)
+  dirs <- directives
+  return $ EnumValueDefinition desc ev dirs
+
+enumValueDefinitions :: Parser [EnumValueDefinition]
+enumValueDefinitions =
+  fmap listFromMaybe (optional $ braces (many enumValueDefinition))
 
 enumValue :: Parser EnumValue
 enumValue = lexeme . try $ do
@@ -182,16 +189,16 @@ operationDefinition :: Parser ExecutableDefinition
 operationDefinition = do
   qm   <- operationType
   n    <- optional name
-  vd   <- optional variableDefinitions
-  dirs <- optional directives
+  vd   <- variableDefinitions
+  dirs <- directives
   sels <- selectionSet
 
-  let operationType = case qm of
+  let ot = case qm of
         "query"    -> Query
         "mutation" -> Mutation
         _          -> Subscription
 
-  return $ Operation operationType n (maybeToList vd) (maybeToList dirs) sels
+  return $ Operation ot n vd dirs sels
 
 field :: Parser Selection
 field = do
@@ -199,25 +206,17 @@ field = do
   col <- optional colon
   case col of
     Nothing -> do
-      args <- optional arguments
-      dirs <- optional directives
-      sels <- optional selectionSet
-      return $ Field Nothing
-                     x
-                     (maybeToList args)
-                     (maybeToList dirs)
-                     (maybeToList sels)
+      args <- arguments
+      dirs <- directives
+      sels <- selectionSet
+      return $ Field Nothing x args dirs sels
 
     Just _ -> do
       y    <- name
-      args <- optional arguments
-      dirs <- optional directives
-      sels <- optional selectionSet
-      return $ Field (Just x)
-                     y
-                     (maybeToList args)
-                     (maybeToList dirs)
-                     (maybeToList sels)
+      args <- arguments
+      dirs <- directives
+      sels <- selectionSet
+      return $ Field (Just x) y args dirs sels
 
 fragmentDefinition :: Parser ExecutableDefinition
 fragmentDefinition = do
@@ -225,9 +224,9 @@ fragmentDefinition = do
   name <- fragmentName
   symbol "on"
   typeCond <- namedType
-  dirs     <- optional directives
+  dirs     <- directives
   sels     <- selectionSet
-  return $ Fragment name typeCond (maybeToList dirs) sels
+  return $ Fragment name typeCond dirs sels
 
 fragmentSpread :: Parser Selection
 fragmentSpread = symbol "..." >> FragmentSpread <$> name <*> directives
@@ -241,18 +240,17 @@ inlineFragment = do
   on <- optional $ symbol "on"
   case on of
     Nothing -> do
-      dirs <- optional directives
+      dirs <- directives
       sels <- selectionSet
-      return $ InlineFragment Nothing (maybeToList dirs) sels
+      return $ InlineFragment Nothing dirs sels
     Just _ -> do
       n    <- namedType
-      dirs <- optional directives
+      dirs <- directives
       sels <- selectionSet
-      return $ InlineFragment (Just n) (maybeToList dirs) sels
+      return $ InlineFragment (Just n) dirs sels
 
 selectionSet :: Parser SelectionSet
-selectionSet = braces $ many selection
-
+selectionSet = fmap listFromMaybe (optional $ braces $ many selection)
 
 argument :: Parser Argument
 argument = objectField
@@ -273,8 +271,7 @@ value =
     <|> (EnumValue <$> enumValue)
 
 objectFields :: Parser [ObjectField]
-objectFields =
-  try (symbol "{" >> symbol "}" >> return []) <|> braces (many objectField)
+objectFields = braces (many objectField)
 
 objectField :: Parser ObjectField
 objectField = do
@@ -291,7 +288,7 @@ directive = do
   symbol "@"
   n    <- name
   args <- optional arguments
-  return $ Directive n (maybeToList args)
+  return $ Directive n (listFromMaybe args)
 
 directives :: Parser [Directive]
 directives = many directive
