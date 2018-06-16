@@ -24,6 +24,7 @@ dependencies:
 - containers
 - megaparsec
 - text
+- validation
 
 library:
   source-dirs: src
