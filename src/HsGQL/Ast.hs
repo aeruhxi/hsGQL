@@ -1,4 +1,4 @@
-module Hagql.Ast where
+module HsGQL.Ast where
 
 import           Data.Text                      ( Text )
 import           Data.List.NonEmpty             ( NonEmpty )

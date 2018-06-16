@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Hagql.Lexer where
+module HsGQL.Lexer where
 
 import           Text.Megaparsec
 import           Text.Megaparsec.Char

@@ -1,4 +1,4 @@
-module Hagql.Util
+module HsGQL.Util
   ( listFromMaybe
   )
 where

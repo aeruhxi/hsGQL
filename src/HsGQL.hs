@@ -1,4 +1,4 @@
-module Hagql
+module HsGQL
     ( someFunc
     )
 where

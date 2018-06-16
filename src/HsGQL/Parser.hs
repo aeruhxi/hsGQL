@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Hagql.Parser where
+module HsGQL.Parser
+  ( document
+  ) where
 
 import           Prelude                 hiding ( null )
-import           Hagql.Ast
-import           Hagql.Lexer
+import           HsGQL.Ast
+import           HsGQL.Lexer
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer    as L
@@ -15,7 +17,7 @@ import           Data.Text                      ( Text
                                                 , unpack
                                                 )
 import           Data.Functor                   ( void )
-import           Hagql.Util                     ( listFromMaybe )
+import           HsGQL.Util                     ( listFromMaybe )
 
 -- Root Document Parser
 document :: Parser Document

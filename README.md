@@ -1,1 +1,1 @@
-# hagql
+# hsGQL

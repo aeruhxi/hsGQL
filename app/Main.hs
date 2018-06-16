@@ -1,6 +1,6 @@
 module Main where
 
-import           Hagql
+import           HsGQL
 
 main :: IO ()
 main = someFunc
